@@ -28,7 +28,7 @@
 // 14: 比較 (明)
 // 15: 差の絶対値
 // 16: 除外
-#define LAYER_MODE 3
+#define LAYER_MODE 0
 
 
 // 解らない人はここから下はいじらないでください
@@ -327,7 +327,7 @@ float4 PS_DepthDraw(VS_OUTPUT IN) : COLOR
 //return float4(LinearDepth.rrr,1);
 
     // 深度からの色の決定
-    float3 LutColor = tex2D(LutSampler, float2(LinearDepth, uv.x) + float2(AcsY / 10, AcsX / 10));
+    float3 LutColor = tex2D(LutSampler, float2(LinearDepth, uv.x) - float2(AcsY / 10, AcsX / 10));
     // マスクをかけた色合い(All or Nothing)
     float3 MaskLutColor = lerp(LutColor, float3(0, 0, 0), Mask);
 //return float4(MaskLutColor.r, MaskLutColor.g, MaskLutColor.b, 1);
