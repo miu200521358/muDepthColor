@@ -1,13 +1,13 @@
 ////////////////////////////////////////////////////////////////////////////////////////////////
 //
-//  muDepthColor.fx ver1.0.0
+//  muDepthColor.fx ver1.02
 //  深度カラーエフェクト
 //  作成: miu( ベース: DepthMap(エーアイス様), M4Layer(ミーフォ茜様) )
 //
 ////////////////////////////////////////////////////////////////////////////////////////////////
 
 // カラールックアップテーブルのファイル名
-#define LUT_FILENAME "Rainbow.png"
+#define LUT_FILENAME "tex/Sepia.png"
 
 // [M4Layer(ミーフォ茜様)]より /////////////////////////////////
 // レイヤーモード
@@ -28,7 +28,11 @@
 // 14: 比較 (明)
 // 15: 差の絶対値
 // 16: 除外
-#define LAYER_MODE 0
+// 17: 色相
+// 18: 彩度
+// 19: カラー
+// 20: 輝度
+#define LAYER_MODE 5
 
 
 // 解らない人はここから下はいじらないでください
@@ -231,70 +235,80 @@ float3 SetSat(float3 rgb, float s)
     return rt;
 }
 
-float3 Blend(float3 a, float3 b)
+float3 Blend(float3 a, float3 b, float c)
 {
+    // 合成結果
+    float3 d;
 #if LAYER_MODE == 17
-    return SetLum(SetSat(b, Sat(a)), Lum(a));   // 色相
+    d = SetLum(SetSat(b, Sat(a)), Lum(a));   // 色相
 #elif LAYER_MODE == 18
-    return SetLum(SetSat(a, Sat(b)), Lum(a));   // 彩度
+    d = SetLum(SetSat(a, Sat(b)), Lum(a));   // 彩度
 #elif LAYER_MODE == 19
-    return SetLum(b, Lum(a));                   // カラー
+    d = SetLum(b, Lum(a));                   // カラー
 #elif LAYER_MODE == 20
-    return SetLum(a, Lum(b));                   // 輝度
+    d = SetLum(a, Lum(b));                   // 輝度
 #else
-    return b;   // 通常
+    d = b;   // 通常
 #endif
+
+    // 透明度を加味
+    return lerp(a, d, c);
 }
 
 #else
 
 float Blend(float a, float b, float c)
 {
+    // 合成結果
+    float d;
 #if LAYER_MODE == 1
-    return a + b;   // 加算
+    d = a + b;   // 加算
 #elif LAYER_MODE == 2
-    return a - b;   // 減算
+    d = a - b;   // 減算
 #elif LAYER_MODE == 3
-    return a * b;   // 乗算
+    d = a * b;   // 乗算
 #elif LAYER_MODE == 4
-    return 1 - (1 - a) * (1 - b);   // スクリーン
+    d = 1 - (1 - a) * (1 - b);   // スクリーン
 #elif LAYER_MODE == 5
-    return a < 0.5
+    d = a < 0.5
         ? a * b * 2
         : 1 - (1 - a) * (1 - b) * 2;    // オーバーレイ
 #elif LAYER_MODE == 6
-    return b < 0.5
+    d = b < 0.5
         ? a * b * 2
         : 1 - (1 - a) * (1 - b) * 2;    // ハードライト
 #elif LAYER_MODE == 7
-    return (1 - b) * pow(a, 2) + b * (1 - pow(1 - b, 2));   // ソフトライト
+    d = (1 - b) * pow(a, 2) + b * (1 - pow(1 - b, 2));   // ソフトライト
 #elif LAYER_MODE == 8
-    return b < 0.5
+    d = b < 0.5
         ? (a >= 1 - b * 2 ? 0 : (a - (1 - b * 2)) / (b * 2))
         : (a < 2 - b * 2 ? a / (2 - b * 2) : 1);    // ビビッドライト
 #elif LAYER_MODE == 9
-    return b < 0.5
+    d = b < 0.5
         ? (a < 1 - b * 2 ? 0 : b * 2 + a - 1)
         : (a < 2 - b * 2 ? b * 2 + a - 1 : 1);  // リニアライト
 #elif LAYER_MODE == 10
-    return b < 0.5
+    d = b < 0.5
         ? (b * 2 < a ? b * 2 : a)
         : (b * 2 - 1 < a ? a : b * 2 - 1);  // ピンライト
 #elif LAYER_MODE == 11
-    return a > 0 ? a / (1 - b) : 0; // 覆い焼き
+    d = a > 0 ? a / (1 - b) : 0; // 覆い焼き
 #elif LAYER_MODE == 12
-    return b > 0 ? 1 - (1 - a) / b : 0; // 焼き込み
+    d = b > 0 ? 1 - (1 - a) / b : 0; // 焼き込み
 #elif LAYER_MODE == 13
-    return min(a, b);   // 比較 (暗)
+    d = min(a, b);   // 比較 (暗)
 #elif LAYER_MODE == 14
-    return max(a, b);   // 比較 (明)
+    d = max(a, b);   // 比較 (明)
 #elif LAYER_MODE == 15
-    return abs(a - b);  // 差の絶対値
+    d = abs(a - b);  // 差の絶対値
 #elif LAYER_MODE == 16
-    return a + b - 2 * a * b;   // 除外
+    d = a + b - 2 * a * b;   // 除外
 #else
-    return lerp(a, b, c);       // 通常
+    d = b;       // 通常
 #endif
+
+    // 透明度を加味
+    return lerp(a, d, c);
 }
 
 #endif
@@ -336,7 +350,7 @@ float4 PS_DepthDraw(VS_OUTPUT IN) : COLOR
     float3 OrgLutColor;
     
 #ifdef IS_COMPOSITE_BLENDING
-    OrgLutColor.rgb = Blend(OrgColor, MaskLutColor.rgb);
+    OrgLutColor.rgb = Blend(OrgColor, MaskLutColor.rgb, AcsTr);
 #else
     [unroll]
     for (int i = 0; i < 3; i++) {
@@ -374,8 +388,8 @@ technique PostEffectTec <
 >{
     pass DepthDraw < string Script = "Draw=Buffer;"; >{
         AlphaBlendEnable = false;
-        VertexShader = compile vs_2_0 VS_DepthDraw();
-        PixelShader  = compile ps_2_0 PS_DepthDraw();
+        VertexShader = compile vs_3_0 VS_DepthDraw();
+        PixelShader  = compile ps_3_0 PS_DepthDraw();
     }
 };
 
